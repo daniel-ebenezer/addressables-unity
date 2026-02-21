@@ -16,7 +16,7 @@ MonoBehaviour:
   m_GUID: b6c28cb554986dc46954500a012bb890
   m_SerializeEntries:
   - m_GUID: d1898619d2ab7b749aeefc31f2572a69
-    m_Address: Rifles/Rifle2.prefab
+    m_Address: Rifles/Rifle2_Remote.prefab
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

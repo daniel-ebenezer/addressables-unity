@@ -1,28 +1,37 @@
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
+using UnityEngine.AddressableAssets.ResourceLocators;
 using System.Threading.Tasks;
 using UnityEngine.Profiling;
+using TMPro;
+using System.Collections.Generic;
 
 public class AddressableLoaderTest : MonoBehaviour
 {
     [Header("Addresses - must match exactly in Addressables Groups")]
-    [SerializeField] private string remoteAddress = "Rifles/Rifle2.prefab";      // From Remote_DLC_Rifles group (CCD)
-    [SerializeField] private string localFallbackAddress = "Rifles/Rifle2.prefab"; // Same address in Default Local Group
+    [SerializeField] private string remoteAddress = "Rifles/Rifle2.prefab";          // CCD / remote version
+    [SerializeField] private string localFallbackAddress = "Rifles/Rifle2.prefab";   // Built-in local fallback
 
-    //[Header("Debug / UI (optional - add Text component later)")]
-    //[SerializeField] private UnityEngine.UI.Text statusText;
+    [Header("UI References - assign in Inspector")]
+    [SerializeField] private TextMeshProUGUI txtStatus;
+    [SerializeField] private TextMeshProUGUI txtTime;
+    [SerializeField] private TextMeshProUGUI txtMemory;
+    [SerializeField] private TextMeshProUGUI txtSource;
+    [SerializeField] private TextMeshProUGUI txtError;
 
     private async void Start()
     {
+        ResetUI();
+        UpdateUIStatus("Starting...");
+
         long startMemory = Profiler.GetTotalAllocatedMemoryLong();
         float startTime = Time.realtimeSinceStartup;
 
-        Debug.Log($"[TEST START] Attempting remote load from CCD: {remoteAddress}");
+        Debug.Log($"[START] Attempting remote load from CCD: {remoteAddress}");
 
-        // 1. Initialize Addressables (downloads remote catalog from CCD if needed)
+        // 1. Initialize Addressables
         var initHandle = Addressables.InitializeAsync(autoReleaseHandle: false);
-
         bool initOK = false;
 
         try
@@ -31,114 +40,140 @@ public class AddressableLoaderTest : MonoBehaviour
 
             if (initHandle.Status == AsyncOperationStatus.Succeeded)
             {
-                Debug.Log("[INIT] Success - CCD remote catalog loaded.");
+                Debug.Log("[INIT] Success - Addressables initialized");
                 initOK = true;
+                UpdateUIStatus("Initialized");
             }
             else
             {
-                Debug.LogWarning($"[INIT] Completed but status: {initHandle.Status}. " +
-                                 $"Details: {initHandle.OperationException?.Message}");
+                Debug.LogWarning($"[INIT] Status: {initHandle.Status}");
+                UpdateUIStatus("Init failed");
             }
         }
         catch (System.Exception ex)
         {
-            Debug.LogError($"[INIT] Exception: {ex.Message}\nStack: {ex.StackTrace}");
+            Debug.LogError($"[INIT] Exception: {ex.Message}");
+            UpdateUIStatus("Init error");
+            UpdateUIError(ex.Message);
         }
 
         Addressables.Release(initHandle);
 
-        if (!initOK)
-        {
-            Debug.LogWarning("[INIT] Issues detected - attempting load anyway (may fallback)");
-        }
+        // 2. Try remote load
+        await TryLoadRemote(startTime, startMemory);
+    }
 
-        // 2. Try remote load first (CCD)
-        AsyncOperationHandle<GameObject> remoteHandle = default;
+    private async Task TryLoadRemote(float startTime, long startMemory)
+    {
+        AsyncOperationHandle<GameObject> handle = default;
 
         try
         {
-            Debug.Log($"[REMOTE] Loading address: {remoteAddress}");
-            remoteHandle = Addressables.LoadAssetAsync<GameObject>(remoteAddress);
+            Debug.Log($"[REMOTE TRY] Address: {remoteAddress} | Time: {Time.realtimeSinceStartup:F3}s");
+            UpdateUIStatus("Loading from CCD...");
 
-            await remoteHandle.Task;
+            handle = Addressables.LoadAssetAsync<GameObject>(remoteAddress);
+            await handle.Task;
 
-            if (remoteHandle.Status == AsyncOperationStatus.Succeeded)
+            if (handle.Status == AsyncOperationStatus.Succeeded)
             {
+                var loadedPrefab = handle.Result;
+
                 float duration = Time.realtimeSinceStartup - startTime;
                 long endMemory = Profiler.GetTotalAllocatedMemoryLong();
-                long memoryDeltaKB = (endMemory - startMemory) / 1024;
+                long deltaKB = (endMemory - startMemory) / 1024;
 
-                Debug.Log($"[SUCCESS - REMOTE/CCD] Loaded {remoteAddress} in {duration:F3} seconds. " +
-                          $"Memory delta: {memoryDeltaKB:F1} KB");
+                Debug.Log($"[REMOTE SUCCESS] Loaded prefab name: {loadedPrefab.name} | Address: {remoteAddress}");
+                Debug.Log($"[REMOTE SUCCESS] Load time: {duration:F3}s | Memory delta: +{deltaKB:F1} KB");
 
-                // Instantiate and keep handle alive
-                var prefab = remoteHandle.Result;
-                var instance = Instantiate(prefab, Vector3.zero, Quaternion.identity);
-                instance.name = "Rifle2_Remote_CCD";
+                UpdateUIStatus("Success - CCD Remote");
+                UpdateUITime($"Load Time: {duration:F3} s");
+                UpdateUIMemory($"Memory Delta: +{deltaKB:F1} KB");
+                UpdateUISource("Source: CCD Remote");
 
-                // Attach releaser so we release only when destroyed
+                var instance = Instantiate(loadedPrefab, Vector3.zero, Quaternion.identity);
+                instance.name = $"Rifle2_CCD_{loadedPrefab.name}";
+
+                Debug.Log($"[INSTANTIATE] Remote instance created: {instance.name} (prefab source: {loadedPrefab.name})");
+
                 var releaser = instance.AddComponent<AddressableReleaser>();
-                releaser.SetHandle(remoteHandle);
+                releaser.SetHandle(handle);
 
-                // Debug check for mesh
-                CheckMesh(instance, "REMOTE");
+                CheckMeshAndMaterial(instance, "CCD");
             }
             else
             {
-                Debug.LogError($"[REMOTE FAIL] {remoteHandle.OperationException?.Message ?? "Unknown"}");
-                await TryLocalFallback(startTime, startMemory);
+                Debug.LogError($"[REMOTE FAIL] Status: {handle.Status} | {handle.OperationException?.Message}");
+                UpdateUIStatus("Remote failed – using local");
+                UpdateUIError(handle.OperationException?.Message ?? "Unknown");
+
+                await TryLoadLocal(startTime, startMemory);
             }
         }
         catch (System.Exception ex)
         {
             Debug.LogError($"[REMOTE EXCEPTION] {ex.Message}");
-            await TryLocalFallback(startTime, startMemory);
+            UpdateUIStatus("Remote error – using local");
+            UpdateUIError(ex.Message);
+
+            await TryLoadLocal(startTime, startMemory);
         }
-        // DO NOT release remoteHandle here - releaser component handles it
     }
 
-    private async Task TryLocalFallback(float originalStartTime, long originalStartMemory)
+    private async Task TryLoadLocal(float startTime, long startMemory)
     {
-        AsyncOperationHandle<GameObject> localHandle = default;
+        AsyncOperationHandle<GameObject> handle = default;
 
         try
         {
-            Debug.Log($"[FALLBACK] Trying local address: {localFallbackAddress}");
-            localHandle = Addressables.LoadAssetAsync<GameObject>(localFallbackAddress);
+            Debug.Log($"[LOCAL TRY] Address: {localFallbackAddress} | Time: {Time.realtimeSinceStartup:F3}s");
+            UpdateUIStatus("Loading local fallback...");
 
-            await localHandle.Task;
+            handle = Addressables.LoadAssetAsync<GameObject>(localFallbackAddress);
+            await handle.Task;
 
-            if (localHandle.Status == AsyncOperationStatus.Succeeded)
+            if (handle.Status == AsyncOperationStatus.Succeeded)
             {
-                float duration = Time.realtimeSinceStartup - originalStartTime;
+                var loadedPrefab = handle.Result;
+
+                float duration = Time.realtimeSinceStartup - startTime;
                 long endMemory = Profiler.GetTotalAllocatedMemoryLong();
-                long memoryDeltaKB = (endMemory - originalStartMemory) / 1024;
+                long deltaKB = (endMemory - startMemory) / 1024;
 
-                Debug.Log($"[SUCCESS - LOCAL FALLBACK] Loaded in {duration:F3} seconds. " +
-                          $"Memory delta: {memoryDeltaKB:F1} KB");
+                Debug.Log($"[LOCAL SUCCESS] Loaded prefab name: {loadedPrefab.name} | Address: {localFallbackAddress}");
+                Debug.Log($"[LOCAL SUCCESS] Load time: {duration:F3}s | Memory delta: +{deltaKB:F1} KB");
 
-                var prefab = localHandle.Result;
-                var instance = Instantiate(prefab, Vector3.zero, Quaternion.identity);
-                instance.name = "Rifle2_Local_Fallback";
+                UpdateUIStatus("Success - Local Fallback");
+                UpdateUITime($"Load Time: {duration:F3} s");
+                UpdateUIMemory($"Memory Delta: +{deltaKB:F1} KB");
+                UpdateUISource("Source: Local Fallback");
+
+                var instance = Instantiate(loadedPrefab, Vector3.zero, Quaternion.identity);
+                instance.name = $"Rifle2_Local_{loadedPrefab.name}";
+
+                Debug.Log($"[INSTANTIATE] Local fallback instance created: {instance.name} (prefab source: {loadedPrefab.name})");
 
                 var releaser = instance.AddComponent<AddressableReleaser>();
-                releaser.SetHandle(localHandle);
+                releaser.SetHandle(handle);
 
-                CheckMesh(instance, "LOCAL FALLBACK");
+                CheckMeshAndMaterial(instance, "LOCAL FALLBACK");
             }
             else
             {
-                Debug.LogError($"[LOCAL FAIL] {localHandle.OperationException?.Message ?? "Unknown"}");
+                Debug.LogError($"[LOCAL FAIL] {handle.OperationException?.Message}");
+                UpdateUIStatus("All loads failed");
+                UpdateUIError(handle.OperationException?.Message ?? "Unknown");
             }
         }
         catch (System.Exception ex)
         {
             Debug.LogError($"[LOCAL EXCEPTION] {ex.Message}");
+            UpdateUIStatus("All loads failed");
+            UpdateUIError(ex.Message);
         }
-        // Releaser component will release localHandle when instance is destroyed
     }
 
-    private void CheckMesh(GameObject instance, string source)
+    private void CheckMeshAndMaterial(GameObject instance, string source)
     {
         var meshFilter = instance.GetComponentInChildren<MeshFilter>();
         if (meshFilter != null && meshFilter.sharedMesh != null)
@@ -150,7 +185,6 @@ public class AddressableLoaderTest : MonoBehaviour
             Debug.LogWarning($"[{source}] Mesh MISSING or null MeshFilter!");
         }
 
-        // Optional: Check material (pink = shader issue)
         var renderer = instance.GetComponentInChildren<Renderer>();
         if (renderer != null && renderer.sharedMaterial != null)
         {
@@ -161,8 +195,27 @@ public class AddressableLoaderTest : MonoBehaviour
             Debug.LogWarning($"[{source}] Material MISSING or pink shader issue!");
         }
     }
-}
 
+    private void ResetUI()
+    {
+        UpdateUIStatus("Initializing...");
+        UpdateUITime("Load Time: -");
+        UpdateUIMemory("Memory Delta: -");
+        UpdateUISource("Source: -");
+        UpdateUIError("");
+    }
+
+    private void UpdateUIStatus(string msg) => SafeSetText(txtStatus, msg);
+    private void UpdateUITime(string msg) => SafeSetText(txtTime, msg);
+    private void UpdateUIMemory(string msg) => SafeSetText(txtMemory, msg);
+    private void UpdateUISource(string msg) => SafeSetText(txtSource, msg);
+    private void UpdateUIError(string msg) => SafeSetText(txtError, msg);
+
+    private void SafeSetText(TextMeshProUGUI text, string msg)
+    {
+        if (text != null) text.text = msg;
+    }
+}
 public class AddressableReleaser : MonoBehaviour
 {
     private AsyncOperationHandle<GameObject> handle;

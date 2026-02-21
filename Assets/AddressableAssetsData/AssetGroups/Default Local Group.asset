@@ -15,11 +15,6 @@ MonoBehaviour:
   m_GroupName: Default Local Group
   m_GUID: 7c1254f58d808864ab472b545a9dd83f
   m_SerializeEntries:
-  - m_GUID: 9ed99366d468c8f4fa754fea73d55904
-    m_Address: Pistols/Pistol2.prefab
-    m_ReadOnly: 0
-    m_SerializedLabels: []
-    FlaggedDuringContentUpdateRestriction: 0
   - m_GUID: be8cdb89d8a700b4698d2229e151ce58
     m_Address: Pistols/Pistol1.prefab
     m_ReadOnly: 0

@@ -2,65 +2,182 @@ using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
 using System.Threading.Tasks;
+using UnityEngine.Profiling;
 
 public class AddressableLoaderTest : MonoBehaviour
 {
-    [SerializeField] string address = "Rifles/Rifle2.prefab";
+    [Header("Addresses - must match exactly in Addressables Groups")]
+    [SerializeField] private string remoteAddress = "Rifles/Rifle2.prefab";      // From Remote_DLC_Rifles group (CCD)
+    [SerializeField] private string localFallbackAddress = "Rifles/Rifle2.prefab"; // Same address in Default Local Group
 
-    async void Start()
+    //[Header("Debug / UI (optional - add Text component later)")]
+    //[SerializeField] private UnityEngine.UI.Text statusText;
+
+    private async void Start()
     {
-        // Initialize Addressables (loads catalog if remote profile active)
-        var initHandle = Addressables.InitializeAsync();  // Returns AsyncOperationHandle<IResourceLocator>
+        long startMemory = Profiler.GetTotalAllocatedMemoryLong();
+        float startTime = Time.realtimeSinceStartup;
+
+        Debug.Log($"[TEST START] Attempting remote load from CCD: {remoteAddress}");
+
+        // 1. Initialize Addressables (downloads remote catalog from CCD if needed)
+        var initHandle = Addressables.InitializeAsync(autoReleaseHandle: false);
+
+        bool initOK = false;
 
         try
         {
             await initHandle.Task;
 
-            // Check status RIGHT after await (before potential auto-release)
             if (initHandle.Status == AsyncOperationStatus.Succeeded)
             {
-                Debug.Log("Addressables initialized successfully! Catalog ready.");
-                // Optional: Debug.Log("Loaded locator: " + initHandle.Result?.LocatorId); // if you want to inspect
+                Debug.Log("[INIT] Success - CCD remote catalog loaded.");
+                initOK = true;
             }
             else
             {
-                Debug.LogWarning($"Addressables init completed with status: {initHandle.Status}");
-                // Can add fallback logic here if needed
+                Debug.LogWarning($"[INIT] Completed but status: {initHandle.Status}. " +
+                                 $"Details: {initHandle.OperationException?.Message}");
             }
         }
         catch (System.Exception ex)
         {
-            Debug.LogError($"Addressables initialization exception: {ex.Message}");
-            return;  // Bail out if fatal
+            Debug.LogError($"[INIT] Exception: {ex.Message}\nStack: {ex.StackTrace}");
         }
 
-        // Release init handle (safe even if auto-released)
         Addressables.Release(initHandle);
 
-        // Proceed to asset load
-        var loadHandle = Addressables.LoadAssetAsync<GameObject>(address);
+        if (!initOK)
+        {
+            Debug.LogWarning("[INIT] Issues detected - attempting load anyway (may fallback)");
+        }
+
+        // 2. Try remote load first (CCD)
+        AsyncOperationHandle<GameObject> remoteHandle = default;
 
         try
         {
-            await loadHandle.Task;
+            Debug.Log($"[REMOTE] Loading address: {remoteAddress}");
+            remoteHandle = Addressables.LoadAssetAsync<GameObject>(remoteAddress);
 
-            if (loadHandle.Status == AsyncOperationStatus.Succeeded)
+            await remoteHandle.Task;
+
+            if (remoteHandle.Status == AsyncOperationStatus.Succeeded)
             {
-                Debug.Log($"Successfully loaded asset from address: {address}");
-                Instantiate(loadHandle.Result, Vector3.zero, Quaternion.identity);
+                float duration = Time.realtimeSinceStartup - startTime;
+                long endMemory = Profiler.GetTotalAllocatedMemoryLong();
+                long memoryDeltaKB = (endMemory - startMemory) / 1024;
+
+                Debug.Log($"[SUCCESS - REMOTE/CCD] Loaded {remoteAddress} in {duration:F3} seconds. " +
+                          $"Memory delta: {memoryDeltaKB:F1} KB");
+
+                // Instantiate and keep handle alive
+                var prefab = remoteHandle.Result;
+                var instance = Instantiate(prefab, Vector3.zero, Quaternion.identity);
+                instance.name = "Rifle2_Remote_CCD";
+
+                // Attach releaser so we release only when destroyed
+                var releaser = instance.AddComponent<AddressableReleaser>();
+                releaser.SetHandle(remoteHandle);
+
+                // Debug check for mesh
+                CheckMesh(instance, "REMOTE");
             }
             else
             {
-                Debug.LogError($"Asset load failed: {loadHandle.OperationException?.Message ?? "Unknown error"}");
+                Debug.LogError($"[REMOTE FAIL] {remoteHandle.OperationException?.Message ?? "Unknown"}");
+                await TryLocalFallback(startTime, startMemory);
             }
         }
         catch (System.Exception ex)
         {
-            Debug.LogError($"Asset load threw exception: {ex.Message}");
+            Debug.LogError($"[REMOTE EXCEPTION] {ex.Message}");
+            await TryLocalFallback(startTime, startMemory);
         }
-        finally
+        // DO NOT release remoteHandle here - releaser component handles it
+    }
+
+    private async Task TryLocalFallback(float originalStartTime, long originalStartMemory)
+    {
+        AsyncOperationHandle<GameObject> localHandle = default;
+
+        try
         {
-            Addressables.Release(loadHandle);  // MUST release to avoid memory leaks
+            Debug.Log($"[FALLBACK] Trying local address: {localFallbackAddress}");
+            localHandle = Addressables.LoadAssetAsync<GameObject>(localFallbackAddress);
+
+            await localHandle.Task;
+
+            if (localHandle.Status == AsyncOperationStatus.Succeeded)
+            {
+                float duration = Time.realtimeSinceStartup - originalStartTime;
+                long endMemory = Profiler.GetTotalAllocatedMemoryLong();
+                long memoryDeltaKB = (endMemory - originalStartMemory) / 1024;
+
+                Debug.Log($"[SUCCESS - LOCAL FALLBACK] Loaded in {duration:F3} seconds. " +
+                          $"Memory delta: {memoryDeltaKB:F1} KB");
+
+                var prefab = localHandle.Result;
+                var instance = Instantiate(prefab, Vector3.zero, Quaternion.identity);
+                instance.name = "Rifle2_Local_Fallback";
+
+                var releaser = instance.AddComponent<AddressableReleaser>();
+                releaser.SetHandle(localHandle);
+
+                CheckMesh(instance, "LOCAL FALLBACK");
+            }
+            else
+            {
+                Debug.LogError($"[LOCAL FAIL] {localHandle.OperationException?.Message ?? "Unknown"}");
+            }
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"[LOCAL EXCEPTION] {ex.Message}");
+        }
+        // Releaser component will release localHandle when instance is destroyed
+    }
+
+    private void CheckMesh(GameObject instance, string source)
+    {
+        var meshFilter = instance.GetComponentInChildren<MeshFilter>();
+        if (meshFilter != null && meshFilter.sharedMesh != null)
+        {
+            Debug.Log($"[{source}] Mesh OK: {meshFilter.sharedMesh.name}");
+        }
+        else
+        {
+            Debug.LogWarning($"[{source}] Mesh MISSING or null MeshFilter!");
+        }
+
+        // Optional: Check material (pink = shader issue)
+        var renderer = instance.GetComponentInChildren<Renderer>();
+        if (renderer != null && renderer.sharedMaterial != null)
+        {
+            Debug.Log($"[{source}] Material OK: {renderer.sharedMaterial.name}");
+        }
+        else
+        {
+            Debug.LogWarning($"[{source}] Material MISSING or pink shader issue!");
+        }
+    }
+}
+
+public class AddressableReleaser : MonoBehaviour
+{
+    private AsyncOperationHandle<GameObject> handle;
+
+    public void SetHandle(AsyncOperationHandle<GameObject> h)
+    {
+        handle = h;
+    }
+
+    private void OnDestroy()
+    {
+        if (handle.IsValid())
+        {
+            Addressables.Release(handle);
+            Debug.Log($"[RELEASER] Released handle for {gameObject.name} on destroy.");
         }
     }
 }

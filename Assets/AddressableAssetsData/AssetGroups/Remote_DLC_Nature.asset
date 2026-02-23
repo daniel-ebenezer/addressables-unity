@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: Remote_DLC_Nature
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
+  m_GroupName: Remote_DLC_Nature
+  m_GUID: 5a2ca7851b008cd4287f71fb64c73565
+  m_SerializeEntries:
+  - m_GUID: b5d261114196d3a44b6576cc347b024f
+    m_Address: Trees/BigTree_Remote
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: cd731fa89f86f144193e6ac5c5d37e4d
+    m_Address: Trees/SmallTree_Remote
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: eb6f86479a94e384fb197b9948bf2d84
+    m_Address: Props/TrashCan_Remote
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: abf83be986c4a3c4297bbdd5f2ad1dd1, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 1b87e8626c4f1e14ca8b1091a1db6420, type: 2}
+    - {fileID: 11400000, guid: 0fda34821b63c704a8bcf9f855b1a1bc, type: 2}

@@ -1,273 +1,368 @@
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
-using UnityEngine.AddressableAssets.ResourceLocators;
 using System.Threading.Tasks;
 using UnityEngine.Profiling;
 using TMPro;
+using System;
 using System.Collections.Generic;
 
 public class AddressableLoaderTest : MonoBehaviour
 {
-    [Header("Addresses - must match exactly in Addressables Groups")]
-    [SerializeField] private string remoteAddress = "Rifles/Rifle2.prefab";          // CCD / remote version
-    [SerializeField] private string localFallbackAddress = "Rifles/Rifle2.prefab";   // Built-in local fallback
+    [Header("=== Managers & Containers ===")]
+    [SerializeField] private ContentSpawner contentSpawner;
 
-    [Header("UI References - assign in Inspector")]
+    [SerializeField, Tooltip("Parent object containing ALL local upgradable objects (vehicles, trees, trash, etc.)")]
+    private Transform localContentParent;
+
+    [Header("=== Vehicle Upgrade Configuration ===")]
+    [SerializeField] private List<string> remoteVehicleKeys = new List<string>
+    {
+        "Vehicles/Sedan",
+        "Vehicles/Truck"
+        // Add more base keys here
+    };
+
+    [Header("=== Tree Upgrade Configuration ===")]
+    [SerializeField] private List<string> remoteTreeKeys = new List<string>
+    {
+        "Nature/Tree_Pine",
+        "Nature/Tree_Oak"
+        // Add your tree base keys
+    };
+
+    [Header("=== Props Upgrade Configuration ===")]
+    [SerializeField] private List<string> remotePropKeys = new List<string>
+    {
+        "Props/TrashCan"
+        // Add more props base keys
+    };
+
+    [Header("Retry / Timeout / Resilience")]
+    [SerializeField] private int maxRetryAttempts = 3;
+    [SerializeField] private float baseRetryDelaySec = 2f;
+    [SerializeField] private float timeoutPerAttemptSec = 15f;
+
+    [Header("UI Elements - assign all in Inspector!")]
     [SerializeField] private TextMeshProUGUI txtStatus;
     [SerializeField] private TextMeshProUGUI txtTime;
     [SerializeField] private TextMeshProUGUI txtMemory;
     [SerializeField] private TextMeshProUGUI txtSource;
     [SerializeField] private TextMeshProUGUI txtError;
+    [SerializeField] private TextMeshProUGUI txtProgress;
 
-    private async void Start()
+    private readonly Dictionary<string, List<GameObject>> localLookup = new();
+
+    private void Awake()
+    {
+        if (contentSpawner == null)
+        {
+            contentSpawner = GameObject.FindAnyObjectByType<ContentSpawner>();
+            if (contentSpawner == null)
+            {
+                Debug.LogError("ContentSpawner missing - assign reference or add to scene");
+            }
+        }
+
+        if (localContentParent == null)
+        {
+            Debug.LogError("LocalContentParent not assigned! Drag 'LocalContentContainer' here.");
+            return;
+        }
+
+        // Early UI validation
+        if (txtStatus == null) Debug.LogError("txtStatus is NULL - assign in Inspector!");
+        if (txtTime == null) Debug.LogError("txtTime is NULL - assign in Inspector!");
+        if (txtMemory == null) Debug.LogError("txtMemory is NULL - assign in Inspector!");
+        if (txtSource == null) Debug.LogError("txtSource is NULL - assign in Inspector!");
+        if (txtError == null) Debug.LogError("txtError is NULL - assign in Inspector!");
+        if (txtProgress == null) Debug.LogError("txtProgress is NULL - assign in Inspector!");
+
+        BuildLocalLookup();
+    }
+
+    private void BuildLocalLookup()
+    {
+        localLookup.Clear();
+
+        var markers = localContentParent.GetComponentsInChildren<LocalContentMarker>(true);
+
+        foreach (var marker in markers)
+        {
+            if (marker == null || string.IsNullOrEmpty(marker.RemoteKey)) continue;
+
+            if (!localLookup.TryGetValue(marker.RemoteKey, out var list))
+            {
+                list = new List<GameObject>();
+                localLookup[marker.RemoteKey] = list;
+            }
+
+            list.Add(marker.gameObject);
+        }
+
+        foreach (var kvp in localLookup)
+        {
+            Debug.Log($"[LOOKUP] {kvp.Key}: {kvp.Value.Count} local instances under {localContentParent.name}");
+        }
+    }
+
+    // BUTTON: Replace Vehicles
+    public async void ReplaceVehiclesWithRemoteDLC()
+    {
+        await ProcessCategory(remoteVehicleKeys, "Vehicles");
+    }
+
+    // BUTTON: Replace Trees
+    public async void ReplaceTreesWithRemoteDLC()
+    {
+        await ProcessCategory(remoteTreeKeys, "Trees");
+    }
+
+    // BUTTON: Replace Props
+    public async void ReplacePropsWithRemoteDLC()
+    {
+        await ProcessCategory(remotePropKeys, "Props");
+    }
+
+    private async Task ProcessCategory(List<string> keys, string categoryName)
     {
         ResetUI();
-        UpdateUIStatus("Starting...");
+        UpdateUIStatus($"Upgrading {categoryName} to remote DLC...");
 
-        long startMemory = Profiler.GetTotalAllocatedMemoryLong();
         float startTime = Time.realtimeSinceStartup;
+        long startMem = Profiler.usedHeapSizeLong;
 
-        Debug.Log($"[START] Attempting remote load from CCD: {remoteAddress}");
+        int totalReplaced = 0;
+        int totalKeys = keys.Count;
 
-        // 1. Initialize Addressables
-        var initHandle = Addressables.InitializeAsync(autoReleaseHandle: false);
-        bool initOK = false;
-
-        try
+        for (int i = 0; i < totalKeys; i++)
         {
-            await initHandle.Task;
+            string baseKey = keys[i];
+            string remoteAddr = baseKey + "_Remote";
 
-            if (initHandle.Status == AsyncOperationStatus.Succeeded)
-            {
-                Debug.Log("[INIT] Success - Addressables initialized");
-                initOK = true;
-                UpdateUIStatus("Initialized");
-            }
-            else
-            {
-                Debug.LogWarning($"[INIT] Status: {initHandle.Status}");
-                UpdateUIStatus("Init failed");
-            }
-        }
-        catch (System.Exception ex)
-        {
-            Debug.LogError($"[INIT] Exception: {ex.Message}");
-            UpdateUIStatus("Init error");
-            UpdateUIError(ex.Message);
+            UpdateUIStatus($"Upgrading {categoryName}: {baseKey} ({i+1}/{totalKeys})");
+            UpdateUIProgress($"{i}/{totalKeys} ({(float)i / totalKeys * 100:F0}%)");
+
+            int replacedThisKey = await TryReplaceAllInstances(baseKey, remoteAddr);
+            totalReplaced += replacedThisKey;
         }
 
-        Addressables.Release(initHandle);
+        float duration = Time.realtimeSinceStartup - startTime;
+        float deltaMB = (Profiler.usedHeapSizeLong - startMem) / (1024f * 1024f);
 
-        // After initOK = true; and Addressables.Release(initHandle);
-
-// 3. Check for dynamic updates / patches
-UpdateUIStatus("Checking for updates...");
-var checkHandle = Addressables.CheckForCatalogUpdates(false);  // false = just check, don't auto-update
-await checkHandle.Task;
-
-bool updated = false;
-if (checkHandle.Status == AsyncOperationStatus.Succeeded && checkHandle.Result != null && checkHandle.Result.Count > 0)
-{
-    Debug.Log($"[PATCH] Found {checkHandle.Result.Count} catalog updates – downloading...");
-    UpdateUIStatus($"Updating... ({checkHandle.Result.Count} patches)");
-
-    var updateHandle = Addressables.UpdateCatalogs(checkHandle.Result, false);  // false = addressables:// URLs only
-    await updateHandle.Task;
-
-    if (updateHandle.Status == AsyncOperationStatus.Succeeded)
-    {
-        Debug.Log("[PATCH] SUCCESS – New bundles applied! (e.g. updated Rifle2.prefab)");
-        UpdateUIStatus("Updated successfully");
-        updated = true;
-    }
-    else
-    {
-        Debug.LogError("[PATCH] Update failed: " + updateHandle.OperationException?.Message);
-        UpdateUIError("Patch failed – using cached");
-    }
-    Addressables.Release(updateHandle);
-}
-else
-{
-    Debug.Log("[PATCH] No updates available – using current catalog");
-}
-Addressables.Release(checkHandle);
-
-// Now proceed to TryLoadRemote() – will use updated catalog/bundles!
-
-        // 2. Try remote load
-        await TryLoadRemote(startTime, startMemory);
+        UpdateUIStatus($"Upgrade complete: {totalReplaced} {categoryName.ToLower()} replaced");
+        UpdateUITime($"Total Time: {duration:F3} s");
+        UpdateUIMemory($"Memory Δ: +{deltaMB:F2} MB");
+        UpdateUIProgress("100% - Done");
     }
 
-    private async Task TryLoadRemote(float startTime, long startMemory)
+    private async Task<int> TryReplaceAllInstances(string baseKey, string remoteAddress)
     {
+        if (!localLookup.TryGetValue(baseKey, out var instances) || instances.Count == 0)
+        {
+            Debug.LogWarning($"No local instances registered for key: {baseKey}");
+            return 0;
+        }
+
         AsyncOperationHandle<GameObject> handle = default;
+        int replacedCount = 0;
 
-        try
+        int attempt = 0;
+        while (attempt < maxRetryAttempts && replacedCount == 0)
         {
-            Debug.Log($"[REMOTE TRY] Address: {remoteAddress} | Time: {Time.realtimeSinceStartup:F3}s");
-            UpdateUIStatus("Loading from CCD...");
+            attempt++;
 
-            handle = Addressables.LoadAssetAsync<GameObject>(remoteAddress);
-            await handle.Task;
-
-            if (handle.Status == AsyncOperationStatus.Succeeded)
+            try
             {
-                var loadedPrefab = handle.Result;
+                Debug.Log($"[LOAD ATTEMPT {attempt}] {remoteAddress}");
 
-                float duration = Time.realtimeSinceStartup - startTime;
-                long endMemory = Profiler.GetTotalAllocatedMemoryLong();
-                long deltaKB = (endMemory - startMemory) / 1024;
+                handle = Addressables.LoadAssetAsync<GameObject>(remoteAddress);
 
-                Debug.Log($"[REMOTE SUCCESS] Loaded prefab name: {loadedPrefab.name} | Address: {remoteAddress}");
-                Debug.Log($"[REMOTE SUCCESS] Load time: {duration:F3}s | Memory delta: +{deltaKB:F1} KB");
+                var timeoutTask = Task.Delay(TimeSpan.FromSeconds(timeoutPerAttemptSec));
+                if (await Task.WhenAny(handle.Task, timeoutTask) == timeoutTask)
+                {
+                    if (!handle.IsDone) Addressables.Release(handle);
+                    throw new TimeoutException($"Timeout loading {remoteAddress}");
+                }
 
-                UpdateUIStatus("Success - CCD Remote");
-                UpdateUITime($"Load Time: {duration:F3} s");
-                UpdateUIMemory($"Memory Delta: +{deltaKB:F1} KB");
-                UpdateUISource("Source: CCD Remote");
+                await handle.Task;
 
-                var instance = Instantiate(loadedPrefab, Vector3.zero, Quaternion.identity);
-                instance.name = $"Rifle2_CCD_{loadedPrefab.name}";
+                if (handle.Status == AsyncOperationStatus.Succeeded)
+                {
+                    var downloadStatus = handle.GetDownloadStatus();
+                    string source = downloadStatus.DownloadedBytes > 0 
+                        ? "Fresh Remote Download" 
+                        : "Cached Remote";
 
-                Debug.Log($"[INSTANTIATE] Remote instance created: {instance.name} (prefab source: {loadedPrefab.name})");
+                    Debug.Log($"[UPGRADE SUCCESS] {source} - {baseKey} - replacing {instances.Count} instances");
 
-                var releaser = instance.AddComponent<AddressableReleaser>();
-                releaser.SetHandle(handle);
+                    // Update UI with source (this was missing!)
+                    UpdateUISource(source);
+                    UpdateUIStatus($"Success: {source} - replacing {instances.Count} {baseKey}");
 
-                CheckMeshAndMaterial(instance, "CCD");
+                    var tempInstances = new List<GameObject>(instances);
+
+                    foreach (var existingLocal in tempInstances)
+                    {
+                        Vector3 pos = existingLocal.transform.position;
+                        Quaternion rot = existingLocal.transform.rotation;
+                        Destroy(existingLocal);
+
+                        var newInstance = Instantiate(handle.Result, pos, rot);
+                        newInstance.name = $"{handle.Result.name}_Remote";
+
+                        var releaser = newInstance.AddComponent<AddressableReleaser>();
+                        releaser.SetHandle(handle);
+
+                        CheckMeshAndMaterial(newInstance, source);
+
+                        replacedCount++;
+                    }
+
+                    localLookup[baseKey].Clear();
+                }
             }
-            else
+            catch (Exception ex)
             {
-                Debug.LogError($"[REMOTE FAIL] Status: {handle.Status} | {handle.OperationException?.Message}");
-                UpdateUIStatus("Remote failed – using local");
-                UpdateUIError(handle.OperationException?.Message ?? "Unknown");
+                Debug.LogWarning($"Attempt {attempt} failed for {remoteAddress}: {ex.Message}");
+                UpdateUIError($"Failed attempt {attempt}: {ex.Message}");
 
-                await TryLoadLocal(startTime, startMemory);
+                if (attempt >= maxRetryAttempts)
+                {
+                    Debug.LogError($"Failed to upgrade {baseKey} after {maxRetryAttempts} attempts");
+                    return 0;
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(baseRetryDelaySec * Mathf.Pow(2, attempt - 1)));
+            }
+            finally
+            {
+                if (handle.IsValid() && replacedCount == 0)
+                    Addressables.Release(handle);
             }
         }
-        catch (System.Exception ex)
-        {
-            Debug.LogError($"[REMOTE EXCEPTION] {ex.Message}");
-            UpdateUIStatus("Remote error – using local");
-            UpdateUIError(ex.Message);
 
-            await TryLoadLocal(startTime, startMemory);
-        }
+        return replacedCount;
     }
 
-    private async Task TryLoadLocal(float startTime, long startMemory)
+    // UI Helpers with debug logs
+    private void ResetUI()
     {
-        AsyncOperationHandle<GameObject> handle = default;
+        UpdateUIStatus("Ready");
+        UpdateUITime("Time: -");
+        UpdateUIMemory("Memory: -");
+        UpdateUISource("Source: -");
+        UpdateUIError("");
+        UpdateUIProgress("Progress: -");
+    }
 
-        try
+    private void UpdateUIStatus(string msg)
+    {
+        Debug.Log($"[UI STATUS] → '{msg}' | txtStatus: {(txtStatus != null ? "VALID" : "NULL")}");
+        SafeSetText(txtStatus, msg);
+    }
+
+    private void UpdateUITime(string msg)
+    {
+        Debug.Log($"[UI TIME] → '{msg}' | txtTime: {(txtTime != null ? "VALID" : "NULL")}");
+        SafeSetText(txtTime, msg);
+    }
+
+    private void UpdateUIMemory(string msg)
+    {
+        Debug.Log($"[UI MEMORY] → '{msg}' | txtMemory: {(txtMemory != null ? "VALID" : "NULL")}");
+        SafeSetText(txtMemory, msg);
+    }
+
+    private void UpdateUISource(string msg)
+    {
+        Debug.Log($"[UI SOURCE] → '{msg}' | txtSource: {(txtSource != null ? "VALID" : "NULL")}");
+        SafeSetText(txtSource, msg);
+    }
+
+    private void UpdateUIError(string msg)
+    {
+        Debug.Log($"[UI ERROR] → '{msg}' | txtError: {(txtError != null ? "VALID" : "NULL")}");
+        SafeSetText(txtError, msg);
+    }
+
+    private void UpdateUIProgress(string msg)
+    {
+        Debug.Log($"[UI PROGRESS] → '{msg}' | txtProgress: {(txtProgress != null ? "VALID" : "NULL")}");
+        SafeSetText(txtProgress, msg);
+    }
+
+    private void SafeSetText(TextMeshProUGUI text, string msg)
+    {
+        if (text != null)
         {
-            Debug.Log($"[LOCAL TRY] Address: {localFallbackAddress} | Time: {Time.realtimeSinceStartup:F3}s");
-            UpdateUIStatus("Loading local fallback...");
-
-            handle = Addressables.LoadAssetAsync<GameObject>(localFallbackAddress);
-            await handle.Task;
-
-            if (handle.Status == AsyncOperationStatus.Succeeded)
-            {
-                var loadedPrefab = handle.Result;
-
-                float duration = Time.realtimeSinceStartup - startTime;
-                long endMemory = Profiler.GetTotalAllocatedMemoryLong();
-                long deltaKB = (endMemory - startMemory) / 1024;
-
-                Debug.Log($"[LOCAL SUCCESS] Loaded prefab name: {loadedPrefab.name} | Address: {localFallbackAddress}");
-                Debug.Log($"[LOCAL SUCCESS] Load time: {duration:F3}s | Memory delta: +{deltaKB:F1} KB");
-
-                UpdateUIStatus("Success - Local Fallback");
-                UpdateUITime($"Load Time: {duration:F3} s");
-                UpdateUIMemory($"Memory Delta: +{deltaKB:F1} KB");
-                UpdateUISource("Source: Local Fallback");
-
-                var instance = Instantiate(loadedPrefab, Vector3.zero, Quaternion.identity);
-                instance.name = $"Rifle2_Local_{loadedPrefab.name}";
-
-                Debug.Log($"[INSTANTIATE] Local fallback instance created: {instance.name} (prefab source: {loadedPrefab.name})");
-
-                var releaser = instance.AddComponent<AddressableReleaser>();
-                releaser.SetHandle(handle);
-
-                CheckMeshAndMaterial(instance, "LOCAL FALLBACK");
-            }
-            else
-            {
-                Debug.LogError($"[LOCAL FAIL] {handle.OperationException?.Message}");
-                UpdateUIStatus("All loads failed");
-                UpdateUIError(handle.OperationException?.Message ?? "Unknown");
-            }
+            text.text = msg;
         }
-        catch (System.Exception ex)
+        else
         {
-            Debug.LogError($"[LOCAL EXCEPTION] {ex.Message}");
-            UpdateUIStatus("All loads failed");
-            UpdateUIError(ex.Message);
+            Debug.LogWarning("SafeSetText called on null TextMeshProUGUI!");
         }
     }
 
     private void CheckMeshAndMaterial(GameObject instance, string source)
     {
-        var meshFilter = instance.GetComponentInChildren<MeshFilter>();
-        if (meshFilter != null && meshFilter.sharedMesh != null)
-        {
-            Debug.Log($"[{source}] Mesh OK: {meshFilter.sharedMesh.name}");
-        }
+        var mf = instance.GetComponentInChildren<MeshFilter>();
+        if (mf?.sharedMesh != null)
+            Debug.Log($"[{source}] Mesh OK: {mf.sharedMesh.name}");
         else
-        {
-            Debug.LogWarning($"[{source}] Mesh MISSING or null MeshFilter!");
-        }
+            Debug.LogWarning($"[{source}] No mesh!");
 
-        var renderer = instance.GetComponentInChildren<Renderer>();
-        if (renderer != null && renderer.sharedMaterial != null)
-        {
-            Debug.Log($"[{source}] Material OK: {renderer.sharedMaterial.name}");
-        }
+        var rend = instance.GetComponentInChildren<Renderer>();
+        if (rend?.sharedMaterial != null)
+            Debug.Log($"[{source}] Material OK: {rend.sharedMaterial.name}");
         else
-        {
-            Debug.LogWarning($"[{source}] Material MISSING or pink shader issue!");
-        }
+            Debug.LogWarning($"[{source}] No material!");
     }
 
-    private void ResetUI()
+    public async void CheckForContentUpdate()
     {
-        UpdateUIStatus("Initializing...");
-        UpdateUITime("Load Time: -");
-        UpdateUIMemory("Memory Delta: -");
-        UpdateUISource("Source: -");
-        UpdateUIError("");
-    }
+        UpdateUIStatus("Checking for updates...");
+        var checkHandle = Addressables.CheckForCatalogUpdates(false);
 
-    private void UpdateUIStatus(string msg) => SafeSetText(txtStatus, msg);
-    private void UpdateUITime(string msg) => SafeSetText(txtTime, msg);
-    private void UpdateUIMemory(string msg) => SafeSetText(txtMemory, msg);
-    private void UpdateUISource(string msg) => SafeSetText(txtSource, msg);
-    private void UpdateUIError(string msg) => SafeSetText(txtError, msg);
-
-    private void SafeSetText(TextMeshProUGUI text, string msg)
-    {
-        if (text != null) text.text = msg;
+        try
+        {
+            await checkHandle.Task;
+            if (checkHandle.Status == AsyncOperationStatus.Succeeded && checkHandle.Result?.Count > 0)
+            {
+                UpdateUIStatus($"Applying {checkHandle.Result.Count} updates...");
+                var updateHandle = Addressables.UpdateCatalogs(checkHandle.Result, false);
+                await updateHandle.Task;
+                Addressables.Release(updateHandle);
+                UpdateUIStatus("Updated! Re-click category buttons to apply.");
+            }
+            else
+            {
+                UpdateUIStatus("Up to date");
+            }
+        }
+        catch (Exception ex)
+        {
+            UpdateUIError(ex.Message);
+        }
+        finally
+        {
+            Addressables.Release(checkHandle);
+        }
     }
 }
+
 public class AddressableReleaser : MonoBehaviour
 {
     private AsyncOperationHandle<GameObject> handle;
 
-    public void SetHandle(AsyncOperationHandle<GameObject> h)
-    {
-        handle = h;
-    }
+    public void SetHandle(AsyncOperationHandle<GameObject> h) => handle = h;
 
     private void OnDestroy()
     {
         if (handle.IsValid())
         {
             Addressables.Release(handle);
-            Debug.Log($"[RELEASER] Released handle for {gameObject.name} on destroy.");
+            Debug.Log($"Released handle for {gameObject.name}");
         }
     }
 }

@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: Local_Core
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
+  m_GroupName: Local_Core
+  m_GUID: 125e6ccca8616c5439604a24ff473615
+  m_SerializeEntries:
+  - m_GUID: 003afca051b76df48ba2867aa7e64899
+    m_Address: Vehicles/SmallCar_Local
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 071afd20f8e4385438d6bb256be5a4e2
+    m_Address: Trees/BigTree_Local
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2e7824e308ac5a642857a1e4f723a77e
+    m_Address: Props/TrashCan_Local
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e58146e6ef0b71449b5df5aea212e8a5
+    m_Address: Vehicles/Van_Local
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f75ef1fabc246f34c8bc66a3b33b90ee
+    m_Address: Trees/SmallTree_Local
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: abf83be986c4a3c4297bbdd5f2ad1dd1, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: 4d34d75a2860ff64588b0150d10da4de, type: 2}
+    - {fileID: 11400000, guid: dc82721f9e1521a48a5017b275562ad5, type: 2}

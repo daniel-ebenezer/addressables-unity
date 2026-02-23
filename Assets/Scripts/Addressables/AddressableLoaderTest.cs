@@ -6,13 +6,14 @@ using UnityEngine.Profiling;
 using TMPro;
 using System;
 using System.Collections.Generic;
+using UnityEngine.UI; // ← Added for Slider
 
 public class AddressableLoaderTest : MonoBehaviour
 {
     [Header("=== Managers & Containers ===")]
     [SerializeField] private ContentSpawner contentSpawner;
 
-    [SerializeField, Tooltip("Parent object containing ALL local upgradable objects (vehicles, trees, trash, etc.)")]
+    [SerializeField, Tooltip("Parent object containing ALL local upgradable objects")]
     private Transform localContentParent;
 
     [Header("=== Vehicle Upgrade Configuration ===")]
@@ -51,6 +52,9 @@ public class AddressableLoaderTest : MonoBehaviour
     [SerializeField] private TextMeshProUGUI txtError;
     [SerializeField] private TextMeshProUGUI txtProgress;
 
+    [Header("Visual Progress Bar (optional but recommended)")]
+    [SerializeField] private Slider progressSlider; // ← New: Drag your UI Slider here
+
     private readonly Dictionary<string, List<GameObject>> localLookup = new();
 
     private void Awake()
@@ -70,13 +74,14 @@ public class AddressableLoaderTest : MonoBehaviour
             return;
         }
 
-        // Early UI validation
+        // UI reference safety checks
         if (txtStatus == null) Debug.LogError("txtStatus is NULL - assign in Inspector!");
         if (txtTime == null) Debug.LogError("txtTime is NULL - assign in Inspector!");
         if (txtMemory == null) Debug.LogError("txtMemory is NULL - assign in Inspector!");
         if (txtSource == null) Debug.LogError("txtSource is NULL - assign in Inspector!");
         if (txtError == null) Debug.LogError("txtError is NULL - assign in Inspector!");
         if (txtProgress == null) Debug.LogError("txtProgress is NULL - assign in Inspector!");
+        if (progressSlider == null) Debug.LogWarning("progressSlider not assigned - progress bar will be disabled");
 
         BuildLocalLookup();
     }
@@ -129,6 +134,13 @@ public class AddressableLoaderTest : MonoBehaviour
         ResetUI();
         UpdateUIStatus($"Upgrading {categoryName} to remote DLC...");
 
+        // Show & reset slider
+        if (progressSlider != null)
+        {
+            progressSlider.value = 0f;
+            progressSlider.gameObject.SetActive(true);
+        }
+
         float startTime = Time.realtimeSinceStartup;
         long startMem = Profiler.usedHeapSizeLong;
 
@@ -141,11 +153,19 @@ public class AddressableLoaderTest : MonoBehaviour
             string remoteAddr = baseKey + "_Remote";
 
             UpdateUIStatus($"Upgrading {categoryName}: {baseKey} ({i+1}/{totalKeys})");
-            UpdateUIProgress($"{i}/{totalKeys} ({(float)i / totalKeys * 100:F0}%)");
+            UpdateUIProgress($"{i+1}/{totalKeys} ({(float)(i+1) / totalKeys * 100:F0}%)");
+
+            // Update slider progressively
+            if (progressSlider != null)
+                progressSlider.value = (float)(i + 1) / totalKeys;
 
             int replacedThisKey = await TryReplaceAllInstances(baseKey, remoteAddr);
             totalReplaced += replacedThisKey;
         }
+
+        // Final snap to 100%
+        if (progressSlider != null)
+            progressSlider.value = 1f;
 
         float duration = Time.realtimeSinceStartup - startTime;
         float deltaMB = (Profiler.usedHeapSizeLong - startMem) / (1024f * 1024f);
@@ -154,6 +174,11 @@ public class AddressableLoaderTest : MonoBehaviour
         UpdateUITime($"Total Time: {duration:F3} s");
         UpdateUIMemory($"Memory Δ: +{deltaMB:F2} MB");
         UpdateUIProgress("100% - Done");
+
+        // Hide slider after a short delay so user sees completion
+        if (progressSlider != null)
+            await Task.Delay(1500);
+            progressSlider.gameObject.SetActive(false);
     }
 
     private async Task<int> TryReplaceAllInstances(string baseKey, string remoteAddress)
@@ -194,11 +219,11 @@ public class AddressableLoaderTest : MonoBehaviour
                         ? "Fresh Remote Download" 
                         : "Cached Remote";
 
-                    Debug.Log($"[UPGRADE SUCCESS] {source} - {baseKey} - replacing {instances.Count} instances");
-
-                    // Update UI with source (this was missing!)
+                    // Update UI source here
                     UpdateUISource(source);
                     UpdateUIStatus($"Success: {source} - replacing {instances.Count} {baseKey}");
+
+                    Debug.Log($"[UPGRADE SUCCESS] {source} - {baseKey} - replacing {instances.Count} instances");
 
                     var tempInstances = new List<GameObject>(instances);
 

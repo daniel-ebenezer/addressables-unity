@@ -59,6 +59,43 @@ public class AddressableLoaderTest : MonoBehaviour
 
         Addressables.Release(initHandle);
 
+        // After initOK = true; and Addressables.Release(initHandle);
+
+// 3. Check for dynamic updates / patches
+UpdateUIStatus("Checking for updates...");
+var checkHandle = Addressables.CheckForCatalogUpdates(false);  // false = just check, don't auto-update
+await checkHandle.Task;
+
+bool updated = false;
+if (checkHandle.Status == AsyncOperationStatus.Succeeded && checkHandle.Result != null && checkHandle.Result.Count > 0)
+{
+    Debug.Log($"[PATCH] Found {checkHandle.Result.Count} catalog updates – downloading...");
+    UpdateUIStatus($"Updating... ({checkHandle.Result.Count} patches)");
+
+    var updateHandle = Addressables.UpdateCatalogs(checkHandle.Result, false);  // false = addressables:// URLs only
+    await updateHandle.Task;
+
+    if (updateHandle.Status == AsyncOperationStatus.Succeeded)
+    {
+        Debug.Log("[PATCH] SUCCESS – New bundles applied! (e.g. updated Rifle2.prefab)");
+        UpdateUIStatus("Updated successfully");
+        updated = true;
+    }
+    else
+    {
+        Debug.LogError("[PATCH] Update failed: " + updateHandle.OperationException?.Message);
+        UpdateUIError("Patch failed – using cached");
+    }
+    Addressables.Release(updateHandle);
+}
+else
+{
+    Debug.Log("[PATCH] No updates available – using current catalog");
+}
+Addressables.Release(checkHandle);
+
+// Now proceed to TryLoadRemote() – will use updated catalog/bundles!
+
         // 2. Try remote load
         await TryLoadRemote(startTime, startMemory);
     }

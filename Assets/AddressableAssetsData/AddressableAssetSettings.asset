@@ -15,7 +15,7 @@ MonoBehaviour:
   m_DefaultGroup: 7c1254f58d808864ab472b545a9dd83f
   m_currentHash:
     serializedVersion: 2
-    Hash: 8921d985050e6c1023e3881ecdbf331b
+    Hash: 00000000000000000000000000000000
   m_OptimizeCatalogSize: 0
   m_BuildRemoteCatalog: 0
   m_CatalogRequestsTimeout: 0
@@ -62,9 +62,11 @@ MonoBehaviour:
   m_GroupAssets:
   - {fileID: 11400000, guid: e9ec1e1be83be86439616fb0ec8223a3, type: 2}
   - {fileID: 11400000, guid: 8f664cf5e60d0f34baec136cf15372c4, type: 2}
+  - {fileID: 11400000, guid: 0ef5f6b98e3a1e640a84029c66b6407e, type: 2}
   - {fileID: 11400000, guid: 76c0361091c21d24daf7b6e18c64a652, type: 2}
   - {fileID: 11400000, guid: 197073b87944453408f44f609c5fa33e, type: 2}
   - {fileID: 11400000, guid: 72cef862e1c6a144f9729f621cb816ca, type: 2}
+  - {fileID: 11400000, guid: 90ead4755e1c0af49bbb454b20112de6, type: 2}
   - {fileID: 11400000, guid: 9a5edf380e9e058408f9666c82928d0d, type: 2}
   m_BuildSettings:
     m_LogResourceManagerExceptions: 1
@@ -133,6 +135,8 @@ MonoBehaviour:
   m_LabelTable:
     m_LabelNames:
     - default
+    - VehicleVariant_A
+    - VehicleVariant_B
   m_SchemaTemplates: []
   m_GroupTemplateObjects:
   - {fileID: 11400000, guid: bb64ba5aa67e50e4d8fb0b5b29a6ee82, type: 2}

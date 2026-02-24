@@ -6,7 +6,7 @@ using UnityEngine.Profiling;
 using TMPro;
 using System;
 using System.Collections.Generic;
-using UnityEngine.UI; // ← Added for Slider
+using UnityEngine.UI;
 
 public class AddressableLoaderTest : MonoBehaviour
 {
@@ -39,6 +39,17 @@ public class AddressableLoaderTest : MonoBehaviour
         // Add more props base keys
     };
 
+    [Header("=== A/B Variant Testing (Vehicles only - cycle with button) ===")]
+    [SerializeField] private bool enableABTesting = false; // Turn ON to enable the cycle A/B button
+
+    [SerializeField] private bool currentVariantIsA = true; // Starts with A, flips each click
+
+    [SerializeField] private string labelVariantA = "Variant_A";
+    [SerializeField] private string labelVariantB = "Variant_B";
+
+    [SerializeField, Tooltip("Only this base key will cycle A/B when the special button is clicked")]
+    private string abTestBaseKey = "Vehicles/Sedan"; // Change to whichever key has variants
+
     [Header("Retry / Timeout / Resilience")]
     [SerializeField] private int maxRetryAttempts = 3;
     [SerializeField] private float baseRetryDelaySec = 2f;
@@ -52,8 +63,8 @@ public class AddressableLoaderTest : MonoBehaviour
     [SerializeField] private TextMeshProUGUI txtError;
     [SerializeField] private TextMeshProUGUI txtProgress;
 
-    [Header("Visual Progress Bar (optional but recommended)")]
-    [SerializeField] private Slider progressSlider; // ← New: Drag your UI Slider here
+    [Header("Visual Progress Bar")]
+    [SerializeField] private Slider progressSlider;
 
     private readonly Dictionary<string, List<GameObject>> localLookup = new();
 
@@ -61,7 +72,7 @@ public class AddressableLoaderTest : MonoBehaviour
     {
         if (contentSpawner == null)
         {
-            contentSpawner = GameObject.FindAnyObjectByType<ContentSpawner>();
+            contentSpawner = UnityEngine.Object.FindAnyObjectByType<ContentSpawner>();
             if (contentSpawner == null)
             {
                 Debug.LogError("ContentSpawner missing - assign reference or add to scene");
@@ -74,14 +85,14 @@ public class AddressableLoaderTest : MonoBehaviour
             return;
         }
 
-        // UI reference safety checks
+        // UI safety checks
         if (txtStatus == null) Debug.LogError("txtStatus is NULL - assign in Inspector!");
         if (txtTime == null) Debug.LogError("txtTime is NULL - assign in Inspector!");
         if (txtMemory == null) Debug.LogError("txtMemory is NULL - assign in Inspector!");
         if (txtSource == null) Debug.LogError("txtSource is NULL - assign in Inspector!");
         if (txtError == null) Debug.LogError("txtError is NULL - assign in Inspector!");
         if (txtProgress == null) Debug.LogError("txtProgress is NULL - assign in Inspector!");
-        if (progressSlider == null) Debug.LogWarning("progressSlider not assigned - progress bar will be disabled");
+        if (progressSlider == null) Debug.LogWarning("progressSlider not assigned");
 
         BuildLocalLookup();
     }
@@ -107,34 +118,48 @@ public class AddressableLoaderTest : MonoBehaviour
 
         foreach (var kvp in localLookup)
         {
-            Debug.Log($"[LOOKUP] {kvp.Key}: {kvp.Value.Count} local instances under {localContentParent.name}");
+            Debug.Log($"[LOOKUP] {kvp.Key}: {kvp.Value.Count} local instances");
         }
     }
 
-    // BUTTON: Replace Vehicles
+    // Original buttons (normal remote load)
     public async void ReplaceVehiclesWithRemoteDLC()
     {
-        await ProcessCategory(remoteVehicleKeys, "Vehicles");
+        await ProcessCategory(remoteVehicleKeys, "Vehicles", false);
     }
 
-    // BUTTON: Replace Trees
     public async void ReplaceTreesWithRemoteDLC()
     {
-        await ProcessCategory(remoteTreeKeys, "Trees");
+        await ProcessCategory(remoteTreeKeys, "Trees", false);
     }
 
-    // BUTTON: Replace Props
     public async void ReplacePropsWithRemoteDLC()
     {
-        await ProcessCategory(remotePropKeys, "Props");
+        await ProcessCategory(remotePropKeys, "Props", false);
     }
 
-    private async Task ProcessCategory(List<string> keys, string categoryName)
+    // Cycle A/B button – only affects the A/B test key
+    public async void CycleABVariantVehicle()
+    {
+        if (!enableABTesting)
+        {
+            UpdateUIStatus("A/B testing is disabled in Inspector");
+            return;
+        }
+
+        // Flip variant each click
+        currentVariantIsA = !currentVariantIsA;
+        UpdateUIStatus($"Cycling to Variant {(currentVariantIsA ? "A" : "B")}");
+
+        // Only replace the A/B test vehicle(s)
+        await ProcessCategory(new List<string> { abTestBaseKey }, "A/B Test Vehicle", true);
+    }
+
+    private async Task ProcessCategory(List<string> keys, string categoryName, bool useVariants = false)
     {
         ResetUI();
         UpdateUIStatus($"Upgrading {categoryName} to remote DLC...");
 
-        // Show & reset slider
         if (progressSlider != null)
         {
             progressSlider.value = 0f;
@@ -150,22 +175,24 @@ public class AddressableLoaderTest : MonoBehaviour
         for (int i = 0; i < totalKeys; i++)
         {
             string baseKey = keys[i];
-            string remoteAddr = baseKey + "_Remote";
+            string remoteAddr = baseKey;
 
             UpdateUIStatus($"Upgrading {categoryName}: {baseKey} ({i+1}/{totalKeys})");
             UpdateUIProgress($"{i+1}/{totalKeys} ({(float)(i+1) / totalKeys * 100:F0}%)");
 
-            // Update slider progressively
             if (progressSlider != null)
                 progressSlider.value = (float)(i + 1) / totalKeys;
 
-            int replacedThisKey = await TryReplaceAllInstances(baseKey, remoteAddr);
+            int replacedThisKey = await TryReplaceAllInstances(baseKey, remoteAddr, useVariants);
             totalReplaced += replacedThisKey;
         }
 
-        // Final snap to 100%
         if (progressSlider != null)
+        {
             progressSlider.value = 1f;
+            await Task.Delay(1500);
+            progressSlider.gameObject.SetActive(false);
+        }
 
         float duration = Time.realtimeSinceStartup - startTime;
         float deltaMB = (Profiler.usedHeapSizeLong - startMem) / (1024f * 1024f);
@@ -174,14 +201,9 @@ public class AddressableLoaderTest : MonoBehaviour
         UpdateUITime($"Total Time: {duration:F3} s");
         UpdateUIMemory($"Memory Δ: +{deltaMB:F2} MB");
         UpdateUIProgress("100% - Done");
-
-        // Hide slider after a short delay so user sees completion
-        if (progressSlider != null)
-            await Task.Delay(1500);
-            progressSlider.gameObject.SetActive(false);
     }
 
-    private async Task<int> TryReplaceAllInstances(string baseKey, string remoteAddress)
+    private async Task<int> TryReplaceAllInstances(string baseKey, string remoteAddress, bool useVariants = false)
     {
         if (!localLookup.TryGetValue(baseKey, out var instances) || instances.Count == 0)
         {
@@ -189,88 +211,118 @@ public class AddressableLoaderTest : MonoBehaviour
             return 0;
         }
 
-        AsyncOperationHandle<GameObject> handle = default;
+        AsyncOperationHandle<GameObject> loadHandle = default;
         int replacedCount = 0;
 
-        int attempt = 0;
-        while (attempt < maxRetryAttempts && replacedCount == 0)
+        string source = "Remote";
+
+        if (useVariants)
         {
-            attempt++;
+            string activeLabel = currentVariantIsA ? labelVariantA : labelVariantB;
+            Debug.Log($"[A/B] Using label: {activeLabel} for {baseKey}");
 
-            try
+            var locationHandle = Addressables.LoadResourceLocationsAsync(
+                new List<object> { remoteAddress, activeLabel },
+                Addressables.MergeMode.Intersection
+            );
+
+            await locationHandle.Task;
+
+            if (locationHandle.Status != AsyncOperationStatus.Succeeded || locationHandle.Result.Count == 0)
             {
-                Debug.Log($"[LOAD ATTEMPT {attempt}] {remoteAddress}");
+                Debug.LogWarning($"[A/B] No location found for {remoteAddress} + {activeLabel} - falling back to normal");
+                Addressables.Release(locationHandle);
+            }
+            else
+            {
+                var primaryLocation = locationHandle.Result[0];
+                loadHandle = Addressables.LoadAssetAsync<GameObject>(primaryLocation);
+                source += $" ({activeLabel})";
+                Addressables.Release(locationHandle);
+            }
+        }
 
-                handle = Addressables.LoadAssetAsync<GameObject>(remoteAddress);
+        if (!loadHandle.IsValid())
+        {
+            loadHandle = Addressables.LoadAssetAsync<GameObject>(remoteAddress);
+        }
 
-                var timeoutTask = Task.Delay(TimeSpan.FromSeconds(timeoutPerAttemptSec));
-                if (await Task.WhenAny(handle.Task, timeoutTask) == timeoutTask)
+        try
+        {
+            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(timeoutPerAttemptSec));
+            if (await Task.WhenAny(loadHandle.Task, timeoutTask) == timeoutTask)
+            {
+                if (!loadHandle.IsDone) Addressables.Release(loadHandle);
+                throw new TimeoutException($"Timeout loading {remoteAddress}");
+            }
+
+            await loadHandle.Task;
+
+            if (loadHandle.Status == AsyncOperationStatus.Succeeded)
+            {
+                var downloadStatus = loadHandle.GetDownloadStatus();
+                source = downloadStatus.DownloadedBytes > 0 
+                    ? $"Fresh {source}" 
+                    : $"Cached {source}";
+
+                UpdateUISource(source);
+                UpdateUIStatus($"Success: {source} - replacing {instances.Count} {baseKey}");
+
+                var tempInstances = new List<GameObject>(instances);
+
+                foreach (var existingLocal in tempInstances)
                 {
-                    if (!handle.IsDone) Addressables.Release(handle);
-                    throw new TimeoutException($"Timeout loading {remoteAddress}");
-                }
+                    Vector3 pos = existingLocal.transform.position;
+                    Quaternion rot = existingLocal.transform.rotation;
+                    Destroy(existingLocal);
 
-                await handle.Task;
+                    // FIXED: Use InstantiateAsync to prevent disappearing mesh
+                    var instantiateHandle = Addressables.InstantiateAsync(
+                        remoteAddress,
+                        pos,
+                        rot,
+                        null,           // no parent
+                        true            // worldSpace = true
+                    );
 
-                if (handle.Status == AsyncOperationStatus.Succeeded)
-                {
-                    var downloadStatus = handle.GetDownloadStatus();
-                    string source = downloadStatus.DownloadedBytes > 0 
-                        ? "Fresh Remote Download" 
-                        : "Cached Remote";
+                    await instantiateHandle.Task;
 
-                    // Update UI source here
-                    UpdateUISource(source);
-                    UpdateUIStatus($"Success: {source} - replacing {instances.Count} {baseKey}");
-
-                    Debug.Log($"[UPGRADE SUCCESS] {source} - {baseKey} - replacing {instances.Count} instances");
-
-                    var tempInstances = new List<GameObject>(instances);
-
-                    foreach (var existingLocal in tempInstances)
+                    if (instantiateHandle.Status == AsyncOperationStatus.Succeeded)
                     {
-                        Vector3 pos = existingLocal.transform.position;
-                        Quaternion rot = existingLocal.transform.rotation;
-                        Destroy(existingLocal);
-
-                        var newInstance = Instantiate(handle.Result, pos, rot);
-                        newInstance.name = $"{handle.Result.name}_Remote";
+                        var newInstance = instantiateHandle.Result;
+                        newInstance.name = $"{newInstance.name}_{source.Replace(" ", "_")}";
 
                         var releaser = newInstance.AddComponent<AddressableReleaser>();
-                        releaser.SetHandle(handle);
+                        releaser.SetHandle(instantiateHandle); // release instantiate handle on destroy
 
                         CheckMeshAndMaterial(newInstance, source);
 
                         replacedCount++;
                     }
-
-                    localLookup[baseKey].Clear();
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"Attempt {attempt} failed for {remoteAddress}: {ex.Message}");
-                UpdateUIError($"Failed attempt {attempt}: {ex.Message}");
-
-                if (attempt >= maxRetryAttempts)
-                {
-                    Debug.LogError($"Failed to upgrade {baseKey} after {maxRetryAttempts} attempts");
-                    return 0;
+                    else
+                    {
+                        Debug.LogError($"[INSTANTIATE FAILED] {instantiateHandle.OperationException?.Message}");
+                    }
                 }
 
-                await Task.Delay(TimeSpan.FromSeconds(baseRetryDelaySec * Mathf.Pow(2, attempt - 1)));
+                localLookup[baseKey].Clear();
             }
-            finally
-            {
-                if (handle.IsValid() && replacedCount == 0)
-                    Addressables.Release(handle);
-            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"Load failed for {remoteAddress}: {ex.Message}");
+            UpdateUIError($"Load failed: {ex.Message}");
+        }
+        finally
+        {
+            if (loadHandle.IsValid())
+                Addressables.Release(loadHandle);
         }
 
         return replacedCount;
     }
 
-    // UI Helpers with debug logs
+    // UI Helpers
     private void ResetUI()
     {
         UpdateUIStatus("Ready");
@@ -281,52 +333,16 @@ public class AddressableLoaderTest : MonoBehaviour
         UpdateUIProgress("Progress: -");
     }
 
-    private void UpdateUIStatus(string msg)
-    {
-        Debug.Log($"[UI STATUS] → '{msg}' | txtStatus: {(txtStatus != null ? "VALID" : "NULL")}");
-        SafeSetText(txtStatus, msg);
-    }
-
-    private void UpdateUITime(string msg)
-    {
-        Debug.Log($"[UI TIME] → '{msg}' | txtTime: {(txtTime != null ? "VALID" : "NULL")}");
-        SafeSetText(txtTime, msg);
-    }
-
-    private void UpdateUIMemory(string msg)
-    {
-        Debug.Log($"[UI MEMORY] → '{msg}' | txtMemory: {(txtMemory != null ? "VALID" : "NULL")}");
-        SafeSetText(txtMemory, msg);
-    }
-
-    private void UpdateUISource(string msg)
-    {
-        Debug.Log($"[UI SOURCE] → '{msg}' | txtSource: {(txtSource != null ? "VALID" : "NULL")}");
-        SafeSetText(txtSource, msg);
-    }
-
-    private void UpdateUIError(string msg)
-    {
-        Debug.Log($"[UI ERROR] → '{msg}' | txtError: {(txtError != null ? "VALID" : "NULL")}");
-        SafeSetText(txtError, msg);
-    }
-
-    private void UpdateUIProgress(string msg)
-    {
-        Debug.Log($"[UI PROGRESS] → '{msg}' | txtProgress: {(txtProgress != null ? "VALID" : "NULL")}");
-        SafeSetText(txtProgress, msg);
-    }
+    private void UpdateUIStatus(string msg) => SafeSetText(txtStatus, msg);
+    private void UpdateUITime(string msg) => SafeSetText(txtTime, msg);
+    private void UpdateUIMemory(string msg) => SafeSetText(txtMemory, msg);
+    private void UpdateUISource(string msg) => SafeSetText(txtSource, msg);
+    private void UpdateUIError(string msg) => SafeSetText(txtError, msg);
+    private void UpdateUIProgress(string msg) => SafeSetText(txtProgress, msg);
 
     private void SafeSetText(TextMeshProUGUI text, string msg)
     {
-        if (text != null)
-        {
-            text.text = msg;
-        }
-        else
-        {
-            Debug.LogWarning("SafeSetText called on null TextMeshProUGUI!");
-        }
+        if (text != null) text.text = msg;
     }
 
     private void CheckMeshAndMaterial(GameObject instance, string source)

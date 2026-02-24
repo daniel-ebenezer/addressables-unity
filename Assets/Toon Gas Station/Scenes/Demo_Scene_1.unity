@@ -14451,7 +14451,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3c78960c0604a474a9ef348288152654, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LocalContentMarker
-  RemoteKey: Vehicles/Sedan_Remote
+  RemoteKey: Vehicles/Sedan
 --- !u!1001 &1703136863
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -15112,19 +15112,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AddressableLoaderTest
   contentSpawner: {fileID: 1826386021}
   localContentParent: {fileID: 729203354}
-  remoteVehicleKeys:
-  - Vehicles/Van
-  - Vehicles/SmallCar
-  remoteTreeKeys:
-  - Trees/SmallTree
-  - Trees/BigTree
-  remotePropKeys:
-  - Props/TrashCan
+  configAsset: {fileID: 11400000, guid: 822c2fb8c80163644b61369da00dab3a, type: 2}
   enableABTesting: 1
   currentVariantIsA: 1
-  labelVariantA: VehicleVariant_A
-  labelVariantB: VehicleVariant_B
-  abTestBaseKey: Vehicles/Sedan_Remote
+  abTestBaseKey: Vehicles/Sedan
   maxRetryAttempts: 3
   baseRetryDelaySec: 2
   timeoutPerAttemptSec: 15

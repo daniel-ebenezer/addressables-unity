@@ -16,39 +16,24 @@ public class AddressableLoaderTest : MonoBehaviour
     [SerializeField, Tooltip("Parent object containing ALL local upgradable objects")]
     private Transform localContentParent;
 
-    [Header("=== Vehicle Upgrade Configuration ===")]
-    [SerializeField] private List<string> remoteVehicleKeys = new List<string>
-    {
-        "Vehicles/Sedan",
-        "Vehicles/Truck"
-        // Add more base keys here
-    };
+    [Header("=== Configuration (replaces hardcoded lists) ===")]
+    [SerializeField] private AddressablesConfig configAsset;
 
-    [Header("=== Tree Upgrade Configuration ===")]
-    [SerializeField] private List<string> remoteTreeKeys = new List<string>
-    {
-        "Nature/Tree_Pine",
-        "Nature/Tree_Oak"
-        // Add your tree base keys
-    };
-
-    [Header("=== Props Upgrade Configuration ===")]
-    [SerializeField] private List<string> remotePropKeys = new List<string>
-    {
-        "Props/TrashCan"
-        // Add more props base keys
-    };
+    // Class-level fields (populated from config)
+    private List<string> remoteVehicleKeys = new List<string>();
+    private List<string> remoteTreeKeys = new List<string>();
+    private List<string> remotePropKeys = new List<string>();
+    private string labelVariantA = "Variant_A";
+    private string labelVariantB = "Variant_B";
+    private string addressSuffix = "_Remote";
 
     [Header("=== A/B Variant Testing (Vehicles only - cycle with button) ===")]
-    [SerializeField] private bool enableABTesting = false; // Turn ON to enable the cycle A/B button
+    [SerializeField] private bool enableABTesting = false;
 
-    [SerializeField] private bool currentVariantIsA = true; // Starts with A, flips each click
-
-    [SerializeField] private string labelVariantA = "Variant_A";
-    [SerializeField] private string labelVariantB = "Variant_B";
+    [SerializeField] private bool currentVariantIsA = true;
 
     [SerializeField, Tooltip("Only this base key will cycle A/B when the special button is clicked")]
-    private string abTestBaseKey = "Vehicles/Sedan"; // Change to whichever key has variants
+    private string abTestBaseKey = "Vehicles/Sedan";
 
     [Header("Retry / Timeout / Resilience")]
     [SerializeField] private int maxRetryAttempts = 3;
@@ -85,6 +70,15 @@ public class AddressableLoaderTest : MonoBehaviour
             return;
         }
 
+        if (configAsset == null)
+        {
+            Debug.LogError("AddressablesConfig asset not assigned!");
+            return;
+        }
+
+        // Read from config (no hardcoding)
+        InitializeFromConfig();
+
         // UI safety checks
         if (txtStatus == null) Debug.LogError("txtStatus is NULL - assign in Inspector!");
         if (txtTime == null) Debug.LogError("txtTime is NULL - assign in Inspector!");
@@ -95,6 +89,36 @@ public class AddressableLoaderTest : MonoBehaviour
         if (progressSlider == null) Debug.LogWarning("progressSlider not assigned");
 
         BuildLocalLookup();
+    }
+
+    private void InitializeFromConfig()
+    {
+        remoteVehicleKeys.Clear();
+        remoteTreeKeys.Clear();
+        remotePropKeys.Clear();
+
+        foreach (var cat in configAsset.categories)
+        {
+            if (cat.categoryName == "Vehicles") remoteVehicleKeys.AddRange(cat.baseKeys);
+            else if (cat.categoryName == "Trees") remoteTreeKeys.AddRange(cat.baseKeys);
+            else if (cat.categoryName == "Props") remotePropKeys.AddRange(cat.baseKeys);
+        }
+
+        // A/B config
+        foreach (var v in configAsset.abVariants)
+        {
+            if (v.baseKey == abTestBaseKey)
+            {
+                labelVariantA = v.labelA;
+                labelVariantB = v.labelB;
+                break;
+            }
+        }
+
+        // Global suffix fallback
+        addressSuffix = configAsset.defaultAddressSuffix;
+
+        Debug.Log("[CONFIG] Loaded from AddressablesConfig asset");
     }
 
     private void BuildLocalLookup()
@@ -147,11 +171,10 @@ public class AddressableLoaderTest : MonoBehaviour
             return;
         }
 
-        // Flip variant each click
         currentVariantIsA = !currentVariantIsA;
         UpdateUIStatus($"Cycling to Variant {(currentVariantIsA ? "A" : "B")}");
 
-        // Only replace the A/B test vehicle(s)
+        Debug.Log($"[CYCLE DEBUG] Cycle button clicked | Variant: {(currentVariantIsA ? "A" : "B")} | Key: {abTestBaseKey}");
         await ProcessCategory(new List<string> { abTestBaseKey }, "A/B Test Vehicle", true);
     }
 
@@ -172,10 +195,22 @@ public class AddressableLoaderTest : MonoBehaviour
         int totalReplaced = 0;
         int totalKeys = keys.Count;
 
+        // Get suffix from config (per category or default)
+        string suffix = configAsset.defaultAddressSuffix;
+        foreach (var cat in configAsset.categories)
+        {
+            if (cat.categoryName == categoryName)
+            {
+                suffix = cat.addressSuffix;
+                break;
+            }
+        }
+
         for (int i = 0; i < totalKeys; i++)
         {
             string baseKey = keys[i];
-            string remoteAddr = baseKey;
+            string remoteAddr = baseKey + suffix;
+        Debug.Log($"[CATEGORY DEBUG] Processing {categoryName} | BaseKey: {baseKey} | RemoteAddr: {remoteAddr} | UseVariants: {useVariants}");
 
             UpdateUIStatus($"Upgrading {categoryName}: {baseKey} ({i+1}/{totalKeys})");
             UpdateUIProgress($"{i+1}/{totalKeys} ({(float)(i+1) / totalKeys * 100:F0}%)");
@@ -204,125 +239,125 @@ public class AddressableLoaderTest : MonoBehaviour
     }
 
     private async Task<int> TryReplaceAllInstances(string baseKey, string remoteAddress, bool useVariants = false)
+{
+    if (!localLookup.TryGetValue(baseKey, out var instances) || instances.Count == 0)
     {
-        if (!localLookup.TryGetValue(baseKey, out var instances) || instances.Count == 0)
-        {
-            Debug.LogWarning($"No local instances registered for key: {baseKey}");
-            return 0;
-        }
-
-        AsyncOperationHandle<GameObject> loadHandle = default;
-        int replacedCount = 0;
-
-        string source = "Remote";
-
-        if (useVariants)
-        {
-            string activeLabel = currentVariantIsA ? labelVariantA : labelVariantB;
-            Debug.Log($"[A/B] Using label: {activeLabel} for {baseKey}");
-
-            var locationHandle = Addressables.LoadResourceLocationsAsync(
-                new List<object> { remoteAddress, activeLabel },
-                Addressables.MergeMode.Intersection
-            );
-
-            await locationHandle.Task;
-
-            if (locationHandle.Status != AsyncOperationStatus.Succeeded || locationHandle.Result.Count == 0)
-            {
-                Debug.LogWarning($"[A/B] No location found for {remoteAddress} + {activeLabel} - falling back to normal");
-                Addressables.Release(locationHandle);
-            }
-            else
-            {
-                var primaryLocation = locationHandle.Result[0];
-                loadHandle = Addressables.LoadAssetAsync<GameObject>(primaryLocation);
-                source += $" ({activeLabel})";
-                Addressables.Release(locationHandle);
-            }
-        }
-
-        if (!loadHandle.IsValid())
-        {
-            loadHandle = Addressables.LoadAssetAsync<GameObject>(remoteAddress);
-        }
-
-        try
-        {
-            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(timeoutPerAttemptSec));
-            if (await Task.WhenAny(loadHandle.Task, timeoutTask) == timeoutTask)
-            {
-                if (!loadHandle.IsDone) Addressables.Release(loadHandle);
-                throw new TimeoutException($"Timeout loading {remoteAddress}");
-            }
-
-            await loadHandle.Task;
-
-            if (loadHandle.Status == AsyncOperationStatus.Succeeded)
-            {
-                var downloadStatus = loadHandle.GetDownloadStatus();
-                source = downloadStatus.DownloadedBytes > 0 
-                    ? $"Fresh {source}" 
-                    : $"Cached {source}";
-
-                UpdateUISource(source);
-                UpdateUIStatus($"Success: {source} - replacing {instances.Count} {baseKey}");
-
-                var tempInstances = new List<GameObject>(instances);
-
-                foreach (var existingLocal in tempInstances)
-                {
-                    Vector3 pos = existingLocal.transform.position;
-                    Quaternion rot = existingLocal.transform.rotation;
-                    Destroy(existingLocal);
-
-                    // FIXED: Use InstantiateAsync to prevent disappearing mesh
-                    var instantiateHandle = Addressables.InstantiateAsync(
-                        remoteAddress,
-                        pos,
-                        rot,
-                        null,           // no parent
-                        true            // worldSpace = true
-                    );
-
-                    await instantiateHandle.Task;
-
-                    if (instantiateHandle.Status == AsyncOperationStatus.Succeeded)
-                    {
-                        var newInstance = instantiateHandle.Result;
-                        newInstance.name = $"{newInstance.name}_{source.Replace(" ", "_")}";
-
-                        var releaser = newInstance.AddComponent<AddressableReleaser>();
-                        releaser.SetHandle(instantiateHandle); // release instantiate handle on destroy
-
-                        CheckMeshAndMaterial(newInstance, source);
-
-                        replacedCount++;
-                    }
-                    else
-                    {
-                        Debug.LogError($"[INSTANTIATE FAILED] {instantiateHandle.OperationException?.Message}");
-                    }
-                }
-
-                localLookup[baseKey].Clear();
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.LogWarning($"Load failed for {remoteAddress}: {ex.Message}");
-            UpdateUIError($"Load failed: {ex.Message}");
-        }
-        finally
-        {
-            if (loadHandle.IsValid())
-                Addressables.Release(loadHandle);
-        }
-
-        return replacedCount;
+        Debug.LogWarning($"No local instances registered for key: {baseKey}");
+        return 0;
     }
 
-    // UI Helpers
+    AsyncOperationHandle<GameObject> loadHandle = default;
+    int replacedCount = 0;
+
+    string source = "Remote";
+
+    if (useVariants)
+    {
+        string activeLabel = currentVariantIsA ? labelVariantA : labelVariantB;
+        Debug.Log($"[A/B] Using label: {activeLabel} for {baseKey}");
+        Debug.Log($"[A/B DEBUG] Searching for address '{remoteAddress}' + label '{activeLabel}'");
+        var locationHandle = Addressables.LoadResourceLocationsAsync(
+            new List<object> { remoteAddress, activeLabel },
+            Addressables.MergeMode.Intersection
+        );
+
+        await locationHandle.Task;
+
+        if (locationHandle.Status != AsyncOperationStatus.Succeeded || locationHandle.Result.Count == 0)
+        {
+            Debug.LogWarning($"[A/B] No location found for {remoteAddress} + {activeLabel} - falling back to normal");
+            Addressables.Release(locationHandle);
+        }
+        else
+        {
+            var primaryLocation = locationHandle.Result[0];
+            loadHandle = Addressables.LoadAssetAsync<GameObject>(primaryLocation);
+            source += $" ({activeLabel})";
+            Addressables.Release(locationHandle);
+        }
+    }
+
+    if (!loadHandle.IsValid())
+    {
+        loadHandle = Addressables.LoadAssetAsync<GameObject>(remoteAddress);
+    }
+
+    try
+    {
+        var timeoutTask = Task.Delay(TimeSpan.FromSeconds(timeoutPerAttemptSec));
+        if (await Task.WhenAny(loadHandle.Task, timeoutTask) == timeoutTask)
+        {
+            if (!loadHandle.IsDone) Addressables.Release(loadHandle);
+            throw new TimeoutException($"Timeout loading {remoteAddress}");
+        }
+
+        await loadHandle.Task;
+
+        if (loadHandle.Status == AsyncOperationStatus.Succeeded)
+        {
+            var downloadStatus = loadHandle.GetDownloadStatus();
+            source = downloadStatus.DownloadedBytes > 0 
+                ? $"Fresh {source}" 
+                : $"Cached {source}";
+
+            UpdateUISource(source);
+            UpdateUIStatus($"Success: {source} - replacing {instances.Count} {baseKey}");
+
+            var tempInstances = new List<GameObject>(instances);
+
+            foreach (var existingLocal in tempInstances)
+            {
+                Vector3 pos = existingLocal.transform.position;
+                Quaternion rot = existingLocal.transform.rotation;
+                Destroy(existingLocal);
+
+                // FIXED: Use InstantiateAsync to wait for ALL dependencies
+                var instantiateHandle = Addressables.InstantiateAsync(
+                    remoteAddress,  // or primaryLocation if using variants
+                    pos,
+                    rot,
+                    null,           // no parent
+                    true            // worldSpace = true
+                );
+
+                await instantiateHandle.Task;
+
+                if (instantiateHandle.Status == AsyncOperationStatus.Succeeded)
+                {
+                    var newInstance = instantiateHandle.Result;
+                    newInstance.name = $"{newInstance.name}_{source.Replace(" ", "_")}";
+
+                    var releaser = newInstance.AddComponent<AddressableReleaser>();
+                    releaser.SetHandle(instantiateHandle); // IMPORTANT: release instantiate handle
+
+                    CheckMeshAndMaterial(newInstance, source);
+
+                    replacedCount++;
+                }
+                else
+                {
+                    Debug.LogError($"[INSTANTIATE FAILED] {instantiateHandle.OperationException?.Message}");
+                }
+            }
+
+            localLookup[baseKey].Clear();
+        }
+    }
+    catch (Exception ex)
+    {
+        Debug.LogWarning($"Load failed for {remoteAddress}: {ex.Message}");
+        UpdateUIError($"Load failed: {ex.Message}");
+    }
+    finally
+    {
+        if (loadHandle.IsValid())
+            Addressables.Release(loadHandle);
+    }
+
+    return replacedCount;
+}   
+
+    // UI Helpers (unchanged)
     private void ResetUI()
     {
         UpdateUIStatus("Ready");

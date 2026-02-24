@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a5e3a2338e516a74cb88006ee23a092c, type: 3}
+  m_Name: AddressablesConfig
+  m_EditorClassIdentifier: Assembly-CSharp::AddressablesConfig
+  categories:
+  - categoryName: Vehicles
+    addressSuffix: _Remote
+    baseKeys:
+    - Vehicles/SmallCar
+    - Vehicles/Van
+  - categoryName: Trees
+    addressSuffix: _Remote
+    baseKeys:
+    - Trees/SmallTree
+    - Trees/BigTree
+  - categoryName: Props
+    addressSuffix: _Remote
+    baseKeys:
+    - Props/TrashCan
+  abVariants:
+  - baseKey: Vehicles/Sedan
+    labelA: VehicleVariantA
+    labelB: VehicleVariantB
+  defaultAddressSuffix: _Remote
+  defaultLabelA: Variant_A
+  defaultLabelB: Variant_B

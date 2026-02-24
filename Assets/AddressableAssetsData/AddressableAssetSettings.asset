@@ -78,7 +78,7 @@ MonoBehaviour:
       m_ProfileName: Default
       m_Values:
       - m_Id: 1ad46a3c19c051f419d5a490f9950cde
-        m_Value: '{UnityEngine.Application.streamingAssetsPath}/[BuildTarget]'
+        m_Value: 
       - m_Id: 232fcab282171c44e9a3e4bf0e0a9fd4
         m_Value: '[UnityEngine.AddressableAssets.Addressables.BuildPath]/[BuildTarget]'
       - m_Id: 8bc22e9b524b51f48873779f26f05b29
@@ -106,7 +106,7 @@ MonoBehaviour:
       m_ProfileName: CCD_Live
       m_Values:
       - m_Id: 1ad46a3c19c051f419d5a490f9950cde
-        m_Value: '{UnityEngine.Application.streamingAssetsPath}/[BuildTarget]'
+        m_Value: https://33edd054-b17a-4cc5-9a2d-990f97f43851.client-api.unity3dusercontent.com/client_api/v1/environments/production/buckets/b2f2b527-7182-4808-a86a-f36cac49d066/releases/a0513928-d262-4d4d-881d-d67f821d9a25/entry_by_path/content/?path=
       - m_Id: 232fcab282171c44e9a3e4bf0e0a9fd4
         m_Value: '[UnityEngine.AddressableAssets.Addressables.BuildPath]/[BuildTarget]'
       - m_Id: 8bc22e9b524b51f48873779f26f05b29

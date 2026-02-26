@@ -4,8 +4,6 @@ using UnityEngine.Pool;
 
 public class ContentSpawner : MonoBehaviour
 {
-    [SerializeField] private Transform defaultSpawnPoint;
-    [SerializeField] private float spawnOffsetRange = 2f;
 
     private readonly List<GameObject> activeObjects = new();
     private readonly Dictionary<string, ObjectPool<GameObject>> prefabPools = new();
@@ -32,12 +30,11 @@ public class ContentSpawner : MonoBehaviour
 
         var instance = pool.Get();
         instance.transform.SetPositionAndRotation(position, rotation);
-        instance.transform.position += Random.insideUnitSphere * spawnOffsetRange;
 
         instance.name = $"{prefab.name}_{source}";
         activeObjects.Add(instance);
 
-        Debug.Log($"Spawned: {instance.name} from {source}");
+        //Debug.Log($"Spawned: {instance.name} from {source}");
 
         return instance;
     }
@@ -56,7 +53,6 @@ public class ContentSpawner : MonoBehaviour
             }
         }
         activeObjects.Clear();
-        Debug.Log("Cleared all spawned objects");
     }
 
     private void OnDestroy()

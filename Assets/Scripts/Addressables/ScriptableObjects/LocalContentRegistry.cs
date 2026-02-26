@@ -6,31 +6,12 @@ using System.Collections.Generic;
 public class LocalContentRegistry : ScriptableObject
 {       
     [Serializable]
-public class Entry
-{
-    public string RemoteKey = "";
-    public string Category = ""; // optional
-    // No GameObject field anymore
-}
+    public class Entry
+    {
+        public string RemoteKey = "";
+        public string Category = ""; 
+    }
 
-    [Header("All local content that can be upgraded via remote DLC")]
     public List<Entry> entries = new List<Entry>();
 
-#if UNITY_EDITOR
-    // Optional: Quick validation button in Inspector
-    [ContextMenu("Validate Entries")]
-    private void Validate()
-    {
-        int invalid = 0;
-        foreach (var entry in entries)
-        {
-            if (string.IsNullOrEmpty(entry.RemoteKey))
-            {
-                Debug.LogWarning($"Invalid entry: {entry.RemoteKey}", this);
-                invalid++;
-            }
-        }
-        Debug.Log($"Validation: {entries.Count} entries, {invalid} invalid", this);
-    }
-#endif
 }

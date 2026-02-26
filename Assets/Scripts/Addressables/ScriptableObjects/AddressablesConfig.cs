@@ -8,17 +8,17 @@ public class AddressablesConfig : ScriptableObject
     [Serializable]
     public class CategoryConfig
     {
-        public string categoryName;          // "Vehicles", "Trees", "Props"
-        public string addressSuffix = "_Remote"; // customizable per category
-        public List<string> baseKeys;        // "Vehicles/Sedan", "Vehicles/Truck", ...
+        public string categoryName;          
+        public string addressSuffix; 
+        public List<string> baseKeys;        
     }
 
     [Serializable]
     public class VariantConfig
     {
-        public string baseKey;               // e.g. "Vehicles/Sedan"
-        public string labelA = "Variant_A";
-        public string labelB = "Variant_B";
+        public string baseKey;               
+        public string labelA;
+        public string labelB;
     }
 
     [Header("Category Settings")]
@@ -28,7 +28,7 @@ public class AddressablesConfig : ScriptableObject
     public List<VariantConfig> abVariants = new List<VariantConfig>();
 
     [Header("Global Defaults")]
-    public string defaultAddressSuffix = "_Remote";
-    public string defaultLabelA = "Variant_A";
-    public string defaultLabelB = "Variant_B";
+    public string defaultAddressSuffix;
+    public string defaultLabelA;
+    public string defaultLabelB;
 }

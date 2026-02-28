@@ -31,6 +31,8 @@ This prototype demonstrates exactly that: a production-ready content pipeline bu
 
 [![Unity Addressables Live-Ops Prototype](screenshots/thumbnail.png)](https://youtu.be/lSHGrnhSZqQ)
 
+Click to open on Youtube
+
 
 ### Screenshots 
 

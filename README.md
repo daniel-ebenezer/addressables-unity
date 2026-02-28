@@ -19,7 +19,7 @@
 Live-service games demand small app sizes, frequent patches, data-driven A/B testing, and mobile/offline support.  
 This prototype demonstrates exactly that: a production-ready content pipeline built for real-world live-ops constraints.
 
-###Project Controls
+### Project Controls
 
 - Download buttons will download from remote, or used cached files if it has already been downloaded.
 - A/B testing button will change the model to its other variant

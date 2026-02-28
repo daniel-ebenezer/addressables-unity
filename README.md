@@ -29,9 +29,7 @@ This prototype demonstrates exactly that: a production-ready content pipeline bu
 
 ### Prototype video
 
-<div align="center">
-  <iframe width="800" height="450" src="https://www.youtube.com/embed/lSHGrnhSZqQ" title="Unity Addressables Live-Ops Prototype Demo" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-</div>
+[![Unity Addressables Live-Ops Prototype](screenshots/groups.png)](https://youtu.be/lSHGrnhSZqQ)
 
 
 ### Screenshots 

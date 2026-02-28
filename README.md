@@ -29,7 +29,7 @@ This prototype demonstrates exactly that: a production-ready content pipeline bu
 
 ### Prototype video
 
-[![Unity Addressables Live-Ops Prototype](screenshots/groups.png)](https://youtu.be/lSHGrnhSZqQ)
+[![Unity Addressables Live-Ops Prototype](screenshots/thumbnail.png)](https://youtu.be/lSHGrnhSZqQ)
 
 
 ### Screenshots 

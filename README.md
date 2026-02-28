@@ -33,7 +33,7 @@ This prototype demonstrates exactly that: a production-ready content pipeline bu
 <img src="screenshots/build-summary.jpg" width="800" alt="Build summary">
 
 ### No Potential issues found by analyzer
-<img src="screenshots/potenital-issues.jpg" width="800" alt="Potential Issues">
+<img src="screenshots/potential-issues.jpg" width="800" alt="Potential Issues">
 
 **Description**: Duplicates were found, i fixed the problem by creating an addressable group called shared dependencies.
 

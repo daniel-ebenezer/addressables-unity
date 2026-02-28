@@ -1,0 +1,78 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bbb281ee3bf0b054c82ac2347e9e782c, type: 3}
+  m_Name: Shared_Dependencies
+  m_EditorClassIdentifier: Unity.Addressables.Editor::UnityEditor.AddressableAssets.Settings.AddressableAssetGroup
+  m_GroupName: Shared_Dependencies
+  m_GUID: 458048b9245ca9a4a9067313d54ec2ba
+  m_SerializeEntries:
+  - m_GUID: 1f6fd01764dd8ec48b87eb7d604172d0
+    m_Address: Assets/Models/Textures/colormap.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 2ae74ae144a34bf4fb7faa9080ec4fc4
+    m_Address: Assets/Toon Gas Station/Shaders/TGS_CustomToonOutline.shader
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 36e335017ad71d54fbb10842863188ae
+    m_Address: Packages/com.unity.render-pipelines.core/Runtime/RenderPipelineResources/FallbackShader.shader
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 49fcbc63324ceed4b8dcf963e256b1f8
+    m_Address: Assets/Toon Gas Station/Models/Materials/Tree_7A_D.mat
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 933532a4fcc9baf4fa0491de14d08ed7
+    m_Address: Packages/com.unity.render-pipelines.universal/Shaders/Lit.shader
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: 9e5c2501cc427b34daa59f785d2892c2
+    m_Address: Assets/Awb-Free Low Poly Cars/Material/Color.mat
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c34a4dd41a9675643a9eef56e38c32c3
+    m_Address: Assets/Awb-Free Low Poly Cars/Texture/Color.png
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c7b40981c735cfa40b9b3387c4c95051
+    m_Address: Assets/Toon Gas Station/Textures/Tree_7A_D.psd
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: da063c8a9f2f3034f99487e7223e3cf4
+    m_Address: Assets/Toon Gas Station/Textures/Toon_Ramp_1A_D.psd
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: e6e9a19c3678ded42a3bc431ebef7dbd
+    m_Address: Packages/com.unity.render-pipelines.universal/Shaders/Utils/FallbackError.shader
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: eb5ee08e1b0e3e741af903e3cf81b196
+    m_Address: Assets/Awb-Free Low Poly Cars/Material/Color Bloom.mat
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  m_ReadOnly: 0
+  m_Settings: {fileID: 11400000, guid: abf83be986c4a3c4297bbdd5f2ad1dd1, type: 2}
+  m_SchemaSet:
+    m_Schemas:
+    - {fileID: 11400000, guid: ee3fd4686790a5e48a08e8d809c37d56, type: 2}
+    - {fileID: 11400000, guid: 4da695b43ebcfbe43ba2cbc90f483d0a, type: 2}

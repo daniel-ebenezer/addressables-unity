@@ -27,6 +27,13 @@ This prototype demonstrates exactly that: a production-ready content pipeline bu
 - Force remote Toggle - to test remote download again, if cached files are downloaded (deletes cache and gets from remote)
 - Stats panel displays time, memory , status and a small progress bar
 
+### Prototype video
+
+<div align="center">
+  <iframe width="800" height="450" src="https://www.youtube.com/embed/lSHGrnhSZqQ" title="Unity Addressables Live-Ops Prototype Demo" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</div>
+
+
 ### Screenshots 
 
 ### Build Summary

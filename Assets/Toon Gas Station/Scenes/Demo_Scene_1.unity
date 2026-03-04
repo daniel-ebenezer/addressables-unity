@@ -15566,6 +15566,8 @@ MonoBehaviour:
   contentSpawner: {fileID: 1826386021}
   localContentParent: {fileID: 729203354}
   configAsset: {fileID: 11400000, guid: 822c2fb8c80163644b61369da00dab3a, type: 2}
+  forceFreshRemoteAlways: 0
+  toggleForceFresh: {fileID: 826715426}
   enableABTesting: 1
   currentVariantIsA: 1
   abTestBaseKey: Vehicles/Sedan
@@ -15579,8 +15581,6 @@ MonoBehaviour:
   errorText: {fileID: 1951897162}
   progressText: {fileID: 446231094}
   progressSlider: {fileID: 1577851819}
-  forceFreshRemoteAlways: 0
-  toggleForceFresh: {fileID: 826715426}
 --- !u!114 &1826386021
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -17161,7 +17161,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 1826386020}
         m_TargetAssemblyTypeName: AddressableLoaderTest, Assembly-CSharp
-        m_MethodName: ResetToLocalAndClearCache
+        m_MethodName: ClearCacheAndResetToLocal
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}

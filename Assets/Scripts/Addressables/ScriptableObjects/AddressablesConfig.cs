@@ -8,17 +8,19 @@ public class AddressablesConfig : ScriptableObject
     [Serializable]
     public class CategoryConfig
     {
-        public string categoryName;          
-        public string addressSuffix; 
-        public List<string> baseKeys;        
+        public string categoryName;
+        public string addressSuffix = "_Remote";
+        public List<string> baseKeys = new List<string>();
     }
 
     [Serializable]
     public class VariantConfig
     {
-        public string baseKey;               
-        public string labelA;
-        public string labelB;
+        public string baseKey;
+        public string remoteAddressA = "";
+        public string remoteAddressB = "";
+        public string labelA = "Variant_A";
+        public string labelB = "Variant_B";
     }
 
     [Header("Category Settings")]
@@ -28,7 +30,7 @@ public class AddressablesConfig : ScriptableObject
     public List<VariantConfig> abVariants = new List<VariantConfig>();
 
     [Header("Global Defaults")]
-    public string defaultAddressSuffix;
-    public string defaultLabelA;
-    public string defaultLabelB;
+    public string defaultAddressSuffix = "_Remote";
+    public string defaultLabelA = "Variant_A";
+    public string defaultLabelB = "Variant_B";
 }

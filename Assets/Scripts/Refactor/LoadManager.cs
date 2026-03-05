@@ -18,7 +18,6 @@ public static class LoadManager
             return instance;
         }
 
-        Debug.LogError($"Instantiate failed for {address}: {handle.OperationException?.Message}");
         return null;
     }
 }

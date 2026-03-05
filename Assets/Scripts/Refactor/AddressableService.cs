@@ -23,7 +23,6 @@ public class AddressableService : MonoBehaviour
 
         if (configAsset == null)
         {
-            Debug.LogError("AddressablesConfig is missing!");
             return;
         }
 

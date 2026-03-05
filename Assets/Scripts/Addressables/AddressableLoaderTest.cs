@@ -61,7 +61,7 @@ public class AddressableLoaderTest : MonoBehaviour
 
         if (localContentParent == null)
         {
-            Debug.LogError("LocalContentParent not assigned! Drag 'LocalContentContainer' here.");
+            Debug.LogError("LocalContentParent not assigned!");
             return;
         }
 
@@ -259,7 +259,6 @@ public class AddressableLoaderTest : MonoBehaviour
         if (useVariants)
         {
             string activeLabel = currentVariantIsA ? labelVariantA : labelVariantB;
-            Debug.Log($"[A/B] Using label: {activeLabel} for {baseKey}");
 
             var locationHandle = Addressables.LoadResourceLocationsAsync(
                 new List<object> { remoteAddress, activeLabel },
@@ -377,7 +376,6 @@ public class AddressableLoaderTest : MonoBehaviour
     await Addressables.ClearDependencyCacheAsync(new List<object>(), true).Task;
     //Addressables.ClearResourceLocators();
 
-    // Restore locals
     foreach (var pair in replacementMap)
     {
         var remote = pair.Key;
@@ -396,9 +394,7 @@ public class AddressableLoaderTest : MonoBehaviour
     }
 
     replacementMap.Clear();
-    BuildLocalLookup();  // Re-register restored locals
-
-    Debug.Log("[RESET] Cache cleared + locals restored");
+    BuildLocalLookup(); 
 
     UpdateUIStatus("Reset complete! Click replace for fresh remote load.");
 }
@@ -446,7 +442,6 @@ public class AddressableReleaser : MonoBehaviour
         if (handle.IsValid())
         {
             Addressables.Release(handle);
-            Debug.Log($"Released handle for {gameObject.name}");
         }
     }
 }
